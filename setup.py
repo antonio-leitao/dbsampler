@@ -9,6 +9,8 @@ setuptools.setup(
     author="Antonio Leitao",
     author_email="aml.leitao@novaims.unl.pt",
     description="Package to sample points in the decision boundary.",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url="https://github.com/Antonio-Leitao/dbsampler",
     packages=setuptools.find_packages(),
     classifiers=[
