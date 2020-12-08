@@ -1,1 +1,1 @@
-# DBSampler
+# Decision Boundary Sampler
