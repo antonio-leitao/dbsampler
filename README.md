@@ -9,6 +9,10 @@ DBSampler is a package to sample points in the decision boundary of  classificat
   - Returns a sample of points uniformly distributed in the decision boundary.
   - Number of points is user defined. More points for a denser sample, less for a faster run.
   - The points are guarenteed to come from the edges of the condensed Voronoi Diagram (more below).
+<p align="center">
+  <img src="images/linear.png"/>
+  <img src="images/concentric.png"/>
+</p>
 
 ## Installation
 Dependencies:
@@ -43,7 +47,6 @@ For an in-depth explanation look at this [post](https://antonio-leitao.netlify.a
  
 <p align="center">
   <img src="images/voronoi.png" width="400" height="300"/>
-  <figcaption text-align='center'>Voronoi Diagram along with the decision boundary of two classes (black and white).</figcaption>
 </p>
 
  
@@ -51,7 +54,6 @@ For an in-depth explanation look at this [post](https://antonio-leitao.netlify.a
  
 <p align="center">
   <img src="images/voronoiboudary.png" width="400" height="300"/>
-  <figcaption>Sampled point (grey) projected to the hyperplane orthogonal to its nearest neighbours of different classes (black and white).</figcaption>
 </p>
  
 Sketch of proof of convergence. At each iteration in ``n_epochs``:
