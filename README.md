@@ -60,6 +60,13 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
  1. If both nearest neighbours have adjacent Voronoi Cells then, after projection the point is in the decision boundary (by construction).
  2. Else then there must exist a point from class A (or not A) that is the new nearest neighbour (by definition of Voronoi Cells).
  
+<p align="center">
+  <img src="images/linear_0.png"/>
+  <img src="images/linear_1.png"/>
+  <img src="images/linear_2.png"/>
+  <img src="images/linear.png"/>
+</p>
+ 
 ## Performance
 The bottleneck of the algorithm is the calculation of a orthogonal hyperplane for each point at each iteration. For low dimensions (<200) we use the ``null space`` of a matrix. For higher dimensions we approximate it using ``QR-Decomposition``. The average time complexity of the algorithm running _k_ epochs with _n_ points in dimension _d_ is <img src="https://render.githubusercontent.com/render/math?math=O(\sqrt{d} %2B \log{n})^{k}">.
 
