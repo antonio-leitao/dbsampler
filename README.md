@@ -43,7 +43,7 @@ For an in-depth explanation look at this [post](https://antonio-leitao.netlify.a
  
 <p align="center">
   <img src="images/voronoi.png" width="400" height="300"/>
-  <figcaption>Voronoi Diagram along with the decision boundary of two classes (black and white).</figcaption>
+  <figcaption text-align='center'>Voronoi Diagram along with the decision boundary of two classes (black and white).</figcaption>
 </p>
 
  
