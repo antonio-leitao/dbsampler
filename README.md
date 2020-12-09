@@ -29,7 +29,7 @@ pip install dbsampler
 ## Usage
 ```python
 import dbsampler
-cover = dbsampler.DBS(X=X,y=y,n_points=1000,n_epochs=5, distribution='uniform')
+cover = dbsampler.DBS(X=X,y=y,n_points=1000,n_epochs=5, distribution='uniform', metric='euclidean')
 ```
 **Parameters:**
 -  ``X``: numpy array of shape (samples,features) with the points of every class.
