@@ -61,10 +61,10 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
  2. Else then there must exist a point from class A (or not A) that is the new nearest neighbour (by definition of Voronoi Cells).
  
 <p align="center">
-  <img src="images/linear_0.png"/>
-  <img src="images/linear_1.png"/>
-  <img src="images/linear_2.png"/>
-  <img src="images/linear.png"/>
+  <img src="images/linear_0.png" width="150"/>
+  <img src="images/linear_1.png" width="150"/>
+  <img src="images/linear_2.png" width="150"/>
+  <img src="images/linear.png" width="150"/>
 </p>
  
 ## Performance
