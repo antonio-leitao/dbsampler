@@ -61,7 +61,7 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
  2. Else then there must exist a point from class A (or not A) that is the new nearest neighbour (by definition of Voronoi Cells).
  
 ## Performance
-The bottleneck of the algorithm is the calculation of a orthogonal hyperplane for each point at each iteration. For low dimensions (<200) we use the ``null space`` of a matrix. For higher dimensions we approximate it using ``QR-Decomposition``. The average time complexity of the algorithm running _k_ epochs with _n_ points in dimension _d_ is <img src="https://render.githubusercontent.com/render/math?math=O(\sqrt(d) + \long(n))^{k}">.
+The bottleneck of the algorithm is the calculation of a orthogonal hyperplane for each point at each iteration. For low dimensions (<200) we use the ``null space`` of a matrix. For higher dimensions we approximate it using ``QR-Decomposition``. The average time complexity of the algorithm running _k_ epochs with _n_ points in dimension _d_ is <img src="https://render.githubusercontent.com/render/math?math=O(\sqrt{d} + \log{n})^{k}">.
 
 ## Citation
 If you use DBSampler in your work or parts of the algorithm please consider citing:
