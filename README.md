@@ -41,7 +41,7 @@ cover = dbsampler.DBS(X=X,y=y,n_points=1000,n_epochs=5, distribution='uniform')
 ## How does it work?
 For an in-depth explanation look at this [post](https://antonio-leitao.netlify.app/post/aprox_decision/) or at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
  
-<img src="images/voronoi.png" alt="alt text" width="200" height="150">
+<img align="center" src="images/voronoi.png" alt="Voronoi Diagram along with decision boundary of two classes (black and white)" width="400" height="300">
  
  It starts by building an initial uniform sample of the space containing ``n_points``. It then iterativelly "pushes" each point to the hyperplane orthogonal to the one between its closest neighbors of different classes.
  
