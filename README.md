@@ -42,13 +42,17 @@ cover = dbsampler.DBS(X=X,y=y,n_points=1000,n_epochs=5, distribution='uniform')
 For an in-depth explanation look at this [post](https://antonio-leitao.netlify.app/post/aprox_decision/) or at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
  
 <p align="center">
-  <img src="images/voronoi.png" alt="Voronoi Diagram along with the decision boundary of two classes (black and white)." width="400" height="300"/>
+  <img src="images/voronoi.png" width="400" height="300"/>
+  <figcaption>Voronoi Diagram along with the decision boundary of two classes (black and white).</figcaption>
 </p>
 
  
  It starts by building an initial uniform sample of the space containing ``n_points``. It then iterativelly "pushes" each point to the hyperplane orthogonal to the one between its closest neighbors of different classes.
  
-![Figure 2:Some text](images/voronoiboundary.png=200x150)
+<p align="center">
+  <img src="images/voronoiboudary.png" width="400" height="300"/>
+  <figcaption>Sampled point (grey) projected to the hyperplane orthogonal to its nearest neighbours of different classes (black and white).</figcaption>
+</p>
  
 Sketch of proof of convergence. At each iteration in ``n_epochs``:
  1. If both nearest neighbours have adjacent Voronoi Cells then, after projection the point is in the decision boundary (by construction).
