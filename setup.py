@@ -7,7 +7,7 @@ setuptools.setup(
     name="dbsampler", 
     version="0.0.1",
     author="Antonio Leitao",
-    author_email="aml.leitao@novaims.unl.pt",
+    author_email="aleitao@novaims.unl.pt",
     description="Package to sample points in the decision boundary.",
     long_description=long_description,
     long_description_content_type="text/markdown",
