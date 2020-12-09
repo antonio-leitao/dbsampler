@@ -1,4 +1,4 @@
-# Decision Bounday Sampler (DBS)
+# Decision Boundary Sampler (DBS)
 
 
 
