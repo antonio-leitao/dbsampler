@@ -28,21 +28,20 @@ pip install dbsampler
 ## Usage
 ```python
 import dbsampler
-cover = dbsampler.DBS(X=X,y=y,n_points=1000,n_epochs=5, distribution='uniform', metric='euclidean')
+cover = dbsampler.dbs(data=X,labels=y,n_points=1000,n_epochs=5, sparse=True, parallel=True) 
 ```
 **Parameters:**
--  ``X``: numpy array of shape (samples,features) with the points of every class.
- -  ``y``: 1-dimensional numpy array with labels of each points. Array must be flattened.
+-  ``data``: numpy array of shape (samples,features) with the points of every class.
+ -  ``labels``: 1-dimensional numpy array with labels of each points. Array must be flattened.
  -  ``n_points``: This determines the number of points sampled from the decision boundary. More points equates for a denser sample but slows the algorithm. Default is 1000.
- -  ``n_epochs``: This determines the number of epochs to be used. It is an iterative algorithm but it is very fast to converge. Default is 5. Currently working on a proof for an upper bound on the number of necessary iterations. 
- -  ``distribution``: Initial point distribution, it is also the distribution of    the points in the decision boundary. Currently supports only _uniform_         (default).
- -  ``metric``: metric used to compute the nearest neighbours. Currently only      supports euclidean.
+ -  ``sparse``: boolean (default `True`), whether to remove points that are in the same Voronoi Edge or not.
+ -  ``parallel``: boolean (default `True`)
  
 **Returns:**
  -  ``cover``: numpy array (n_points, n_features) of points in the decision boundary.
 
 ## How does it work?
-For an in-depth explanation look at this [post](https://antonio-leitao.netlify.app/post/aprox_decision/) or at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
+For an in-depth explanation check at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
  
 <p align="center">
   <img src="images/voronoi.png" width="300"/>
