@@ -1,8 +1,8 @@
 # Decision Boundary Sampler (DBS)
 
-[![Downloads](https://pepy.tech/badge/dbsampler)](https://pepy.tech/project/dbsampler) [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/Antonio-Leitao/dbsampler/blob/main/LICENSE) [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-03a80e.svg)](https://github.com/Antonio-Leitao) [![version ](https://img.shields.io/badge/release-0.0.1-blue.svg)](https://pypi.org/project/dbsampler/) [![made-with-python](https://img.shields.io/badge/Made%20with-Rust-000000.svg)](https://www.python.org/)
+[![Downloads](https://pepy.tech/badge/dbsampler)](https://pepy.tech/project/dbsampler) [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/Antonio-Leitao/dbsampler/blob/main/LICENSE) [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-03a80e.svg)](https://github.com/Antonio-Leitao) [![version ](https://img.shields.io/badge/release-0.0.1-blue.svg)](https://pypi.org/project/dbsampler/) [![made-with-rust](https://img.shields.io/badge/Made%20with-Rust-000000.svg)](https://www.python.org/)
 
-<img src='assets/logo.png' width='200px' align="right" style="float:right;margin-left:10pt"></img>
+<img src='images/logo.png' width='200px' align="right" style="float:right;margin-left:10pt"></img>
 
 DBSampler is a package to sample points in the decision boundary of  classification problems (binary or multiclass). It is theorically exact and efficient for very high dimensions. The guarentees:
 
@@ -15,7 +15,6 @@ DBSampler is a package to sample points in the decision boundary of  classificat
 </p>
 
 ## Installation
-Dbsampler is built using Rust.
 DBSampler is available on PyPI,
 
 ```sh
@@ -43,11 +42,16 @@ This can drastically reduce the number of points while maintaining a uniform and
 Below is the example of ``5000`` points sampled (left) and the same points with ``sparse=True``.
 
 <p align="center">
-  <img src="images/dense.png"/>
-  <img src="images/sparse.png"/>
+  <img src="images/dense.png" width="350"/>
+  <img src="images/sparse.png" width="350"/>
 </p>
 
 ## Performance
+DBSampler is written in Rust pre-builds the binaries for Windows, MacOS and most Linux distributions.
+If you use an unncommon architecture you might need to install cargo first.
+DBSampler achieves very high performance due to effective parallization and BLAS support.
+
+More improvments are planned specially for high number of samples <50_000 where the current implmentations starts to slow down.
 
 ## How does it work?
 For an in-depth explanation check at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
@@ -74,9 +78,6 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
   <img src="images/linear.png" width="200"/>
 </p>
  
-
-
-
 
 ## Citation
 If you use DBSampler in your work or parts of the algorithm please consider citing:
