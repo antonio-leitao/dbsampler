@@ -1,7 +1,8 @@
 # Decision Boundary Sampler (DBS)
 
+[![Downloads](https://pepy.tech/badge/dbsampler)](https://pepy.tech/project/dbsampler) [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/Antonio-Leitao/dbsampler/blob/main/LICENSE) [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-03a80e.svg)](https://github.com/Antonio-Leitao) [![version ](https://img.shields.io/badge/release-0.0.1-blue.svg)](https://pypi.org/project/dbsampler/) [![made-with-python](https://img.shields.io/badge/Made%20with-Rust-000000.svg)](https://www.python.org/)
 
-[![Downloads](https://pepy.tech/badge/dbsampler)](https://pepy.tech/project/dbsampler) [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/Antonio-Leitao/dbsampler/blob/main/LICENSE) [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-03a80e.svg)](https://github.com/Antonio-Leitao) [![version ](https://img.shields.io/badge/release-0.0.1-blue.svg)](https://pypi.org/project/dbsampler/) [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+<img src='assets/logo.png' width='200px' align="right" style="float:right;margin-left:10pt"></img>
 
 DBSampler is a package to sample points in the decision boundary of  classification problems (binary or multiclass). It is theorically exact and efficient for very high dimensions. The guarentees:
 
@@ -14,11 +15,7 @@ DBSampler is a package to sample points in the decision boundary of  classificat
 </p>
 
 ## Installation
-Dependencies:
-  - Numpy
-  - Scipy
-  - Sklearn
-
+Dbsampler is built using Rust.
 DBSampler is available on PyPI,
 
 ```sh
@@ -39,6 +36,18 @@ cover = dbsampler.dbs(data=X,labels=y,n_points=1000,n_epochs=5, sparse=True, par
  
 **Returns:**
  -  ``cover``: numpy array (n_points, n_features) of points in the decision boundary.
+
+## Sparse
+Passing the ``sparse`` flag will remove the cover points that fall on the same Voronoi Edge, favoring the first one.
+This can drastically reduce the number of points while maintaining a uniform and complete cover of the decision boundary.
+Below is the example of ``5000`` points sampled (left) and the same points with ``sparse=True``.
+
+<p align="center">
+  <img src="images/dense.png"/>
+  <img src="images/sparse.png"/>
+</p>
+
+## Performance
 
 ## How does it work?
 For an in-depth explanation check at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
@@ -65,8 +74,9 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
   <img src="images/linear.png" width="200"/>
 </p>
  
-## Performance
-The bottleneck of the algorithm is the calculation of a orthogonal hyperplane for each point at each iteration. For low dimensions (<200) we use the ``null space`` of a matrix. For higher dimensions we approximate it using ``QR-Decomposition``. The average time complexity of the algorithm running _k_ epochs with _n_ points in dimension _d_ is <img src="https://render.githubusercontent.com/render/math?math=O(\sqrt{d} %2B \log{n})^{k}">.
+
+
+
 
 ## Citation
 If you use DBSampler in your work or parts of the algorithm please consider citing:
