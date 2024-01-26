@@ -84,7 +84,7 @@ Currently manages to calculate a cover of `5 000` points given `10 000` points i
 More improvments are planned targeted situations where the number of samples times the dimensions is higher than 1 billion where the current implmentations starts to slow down.
 
 <p align="center">
-  <img src="images/performance.png"/>
+  <img src="images/perfomance.png"/>
 </p>
 
 ## How does it work?
