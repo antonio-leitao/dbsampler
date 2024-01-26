@@ -15,7 +15,6 @@ authors = [
 ]
 description = "Decision Boundary Sampler"
 readme = "README.md"
-license = "LICENSE.md"
 
 [project.urls]
 homepage = "https://github.com/antonio-leitao/dbsampler"
