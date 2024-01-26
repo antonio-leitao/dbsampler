@@ -26,6 +26,10 @@ jobs:
         target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
     steps:
       - uses: actions/checkout@v3
+      - name: Install OpenBLAS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -49,6 +53,13 @@ jobs:
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v3
+      - name: Install Chocolatey
+        run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+      - name: Install OpenBLAS
+        run: |
+        choco install openblas -y
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
