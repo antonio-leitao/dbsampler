@@ -37,6 +37,9 @@ pip install dbsampler
 On uncommon architectures, you may need to first
 [install Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) before running `pip install vlmc`.
 
+> [!WARNING]  
+> Make sure you have a `blas` source on your system, dbsampler links with `blas` dynamically
+
 ### Compilation from source
 
 In order to compile from source you will need to [install Rust/Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) and [maturin](https://github.com/PyO3/maturin#maturin) for the python bindings.
