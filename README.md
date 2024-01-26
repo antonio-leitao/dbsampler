@@ -28,7 +28,7 @@ DBSampler is a package to sample points in the decision boundary of  classificat
 
 ## Installation
 
-Pre-built packages for many Linux, Windows, and OSX systems are available
+Pre-built packages currently only for MacOS systems are available (working on building for Linux and Windows)
 in [PyPI](https://pypi.org/project/dbsampler/) and can be installed with:
 
 ```sh
@@ -36,9 +36,6 @@ pip install dbsampler
 ```
 On uncommon architectures, you may need to first
 [install Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) before running `pip install vlmc`.
-
-> [!WARNING]  
-> Make sure you have a `blas` source on your system, dbsampler links with `blas` dynamically
 
 ### Compilation from source
 
