@@ -41,6 +41,9 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: 'true'
           manylinux: auto
+          link-arg: -lblas
+        env:
+          LIBRARY_PATH: /usr/lib/x86_64-linux-gnu:/usr/lib/aarch64-linux-gnu:/usr/lib/arm-linux-gnueabihf:/usr/lib/s390x-linux-gnu:/usr/lib/ppc64le-linux-gnu
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
