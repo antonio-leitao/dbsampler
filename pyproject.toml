@@ -10,7 +10,17 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+authors = [
+  { name="António Leitão", email="aleitao@novaims.unl.pt" },
+]
+description = "Decision Boundary Sampler"
+readme = "README.md"
+license = "LICENSE.md"
 
+[project.urls]
+homepage = "https://github.com/antonio-leitao/dbsampler"
+repository = "https://github.com/antonio-leitao/dbsampler"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+

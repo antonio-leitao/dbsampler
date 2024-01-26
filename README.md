@@ -4,21 +4,51 @@
 
 <img src='images/logo.png' width='200px' align="right" style="float:right;margin-left:10pt"></img>
 
-DBSampler is a package to sample points in the decision boundary of  classification problems (binary or multiclass). It is theorically exact and efficient for very high dimensions. The guarentees:
+### Contents
+- [Installation](#installation)
+  - [Compiling from source](#compilation-from-source)  
+- [Usage](#usage)
+  - [Sparse](#sparse)
+- [How does it work](#how-does-it-work)
+- [Performance](#performance)
+- [Citing](#citing)
 
-  - Returns a sample of points uniformly distributed in the decision boundary.
-  - Number of points is user defined. More points for a denser sample, less for a faster run.
-  - The points are guarenteed to come from the edges of the condensed Voronoi Diagram (more below).
+
 <p align="center">
   <img src="images/linear.png"/>
   <img src="images/concentric.png"/>
 </p>
 
+DBSampler is a package to sample points in the decision boundary of  classification problems (binary or multiclass). It is theorically exact and efficient for very high dimensions. The guarentees:
+
+  - Returns a sample of points uniformly distributed in the decision boundary.
+  - Number of points is user defined. More points for a denser sample, less for a faster run.
+  - The points are guarenteed to come from the edges of the condensed Voronoi Diagram (more below).
+
+
 ## Installation
-DBSampler is available on PyPI,
+
+Pre-built packages for many Linux, Windows, and OSX systems are available
+in [PyPI](https://pypi.org/project/dbsampler/) and can be installed with:
 
 ```sh
 pip install dbsampler
+```
+On uncommon architectures, you may need to first
+[install Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) before running `pip install vlmc`.
+
+### Compilation from source
+
+In order to compile from source you will need to [install Rust/Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) and [maturin](https://github.com/PyO3/maturin#maturin) for the python bindings.
+Maturin is best used within a Python virtual environment:
+
+```sh
+# activate your desired virtual environment first, then:
+pip install maturin
+git clone https://github.com/antonio-leitao/dbsampler.git
+cd vlmc
+# build and install the package:
+maturin develop --release
 ```
 
 ## Usage
@@ -36,7 +66,7 @@ cover = dbsampler.dbs(data=X,labels=y,n_points=1000,n_epochs=5, sparse=True, par
 **Returns:**
  -  ``cover``: numpy array (n_points, n_features) of points in the decision boundary.
 
-## Sparse
+### Sparse
 Passing the ``sparse`` flag will remove the cover points that fall on the same Voronoi Edge, favoring the first one.
 This can drastically reduce the number of points while maintaining a uniform and complete cover of the decision boundary.
 Below is the example of ``5000`` points sampled (left) and the same points with ``sparse=True``.
@@ -48,10 +78,14 @@ Below is the example of ``5000`` points sampled (left) and the same points with 
 
 ## Performance
 DBSampler is written in Rust pre-builds the binaries for Windows, MacOS and most Linux distributions.
-If you use an unncommon architecture you might need to install cargo first.
 DBSampler achieves very high performance due to effective parallization and BLAS support.
+Currently manages to calculate a cover of `5 000` points given `10 000` points in `500` dimensions in less than 10 seconds.
 
-More improvments are planned specially for high number of samples <50_000 where the current implmentations starts to slow down.
+More improvments are planned targeted situations where the number of samples times the dimensions is higher than 1 billion where the current implmentations starts to slow down.
+
+<p align="center">
+  <img src="images/performance.png"/>
+</p>
 
 ## How does it work?
 For an in-depth explanation check at our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims at sampling uniformly points from the edges of Voronoi Cells belonging to points of different classes. The union of these edges is the decision boundary that maximizes the distance between classes.
@@ -79,7 +113,7 @@ Sketch of proof of convergence. At each iteration in ``n_epochs``:
 </p>
  
 
-## Citation
+## Citing
 If you use DBSampler in your work or parts of the algorithm please consider citing:
 ```
 @inproceedings{petri2020on,
