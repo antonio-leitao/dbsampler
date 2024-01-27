@@ -27,8 +27,8 @@ jobs:
       - name: Install OpenBLAS
         run: |
           sudo apt-get update
+          sudo apt-get install libblas-dev -y
           sudo apt-get install liblapack-dev -y ; sudo apt-get install liblapack3 -y ; sudo apt-get install libopenblas-base -y ; sudo apt-get install libopenblas-dev -y
-          export CARGO_BLAS=cblas
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
