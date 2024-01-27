@@ -27,8 +27,7 @@ jobs:
       - name: Install OpenBLAS
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopenblas-dev
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/openblas-base
+          sudo apt-get install liblapack-dev -y ; sudo apt-get install liblapack3 -y ; sudo apt-get install libopenblas-base -y ; sudo apt-get install libopenblas-dev -y ;
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
