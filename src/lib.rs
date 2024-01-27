@@ -1,4 +1,3 @@
-extern crate rblas;
 use pyo3::prelude::*;
 mod linalg;
 use anyhow::{anyhow, Result};
@@ -6,7 +5,6 @@ use hashbrown::HashSet;
 use nohash_hasher::IntSet;
 use rand::Rng;
 use rayon::prelude::*;
-use rblas::Dot;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 struct Neighbours {
