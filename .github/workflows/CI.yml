@@ -29,7 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install liblapack-dev -y ; sudo apt-get install liblapack3 -y ; sudo apt-get install libopenblas-base -y ; sudo apt-get install libopenblas-dev -y f
           sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/4.9/libopenblas-dev.so /usr/lib/libopenblas-dev.so
-          locate libblas.so
+          find / -name libblas.so*
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
