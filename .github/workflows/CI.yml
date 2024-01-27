@@ -29,7 +29,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install libblas-dev -y
           sudo apt-get install liblapack-dev -y ; sudo apt-get install liblapack3 -y ; sudo apt-get install libopenblas-base -y ; sudo apt-get install libopenblas-dev -y
-          export RUSTFLAGS='-L /usr/lib/x86_64-linux-gnu/blas'
+      - name: Verify BLAS installation
+        run: apt list --installed | grep libblas
+      - name: Set RUSTFLAGS
+        run: export RUSTFLAGS='-L /usr/lib/x86_64-linux-gnu/blas'
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
