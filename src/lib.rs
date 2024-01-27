@@ -1,4 +1,6 @@
+extern crate rblas;
 use pyo3::prelude::*;
+use rblas::Dot;
 mod linalg;
 use anyhow::{anyhow, Result};
 use hashbrown::HashSet;
