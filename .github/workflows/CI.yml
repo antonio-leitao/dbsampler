@@ -28,9 +28,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install libblas-dev -y
+          sudo apt-get install lblas-dev -y
           sudo apt-get install liblapack-dev -y ; sudo apt-get install liblapack3 -y ; sudo apt-get install libopenblas-base -y ; sudo apt-get install libopenblas-dev -y
       - name: Verify BLAS installation
-        run: apt list --installed | grep libblas
+        run: apt list --installed | grep blas
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
