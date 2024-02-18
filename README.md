@@ -28,8 +28,7 @@ DBSampler is a package to sample points in the decision boundary of  classificat
 
 ## Installation
 
-Pre-built packages currently only for MacOS systems are available (working on building for Linux and Windows)
-in [PyPI](https://pypi.org/project/dbsampler/) and can be installed with:
+Pre-built packages currently for MacOS, Windows and Linux systems are available in [PyPI](https://pypi.org/project/dbsampler/) and can be installed with:
 
 ```sh
 pip install dbsampler

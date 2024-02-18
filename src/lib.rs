@@ -1,6 +1,4 @@
-extern crate rblas;
 use pyo3::prelude::*;
-use rblas::Dot;
 mod linalg;
 use anyhow::{anyhow, Result};
 use hashbrown::HashSet;
@@ -56,10 +54,10 @@ fn generate_uniform_points(
     let mut rng = rand::thread_rng();
     let cover = (0..n)
         .map(|_| {
-            let coords = (0..dimensions)
+            let coords: Vec<f64> = (0..dimensions)
                 .map(|dim| rng.gen_range(min_values[dim]..max_values[dim]))
                 .collect();
-            let norm = Dot::dot(&coords, &coords);
+            let norm = linalg::ddot(&coords, &coords);
             Point {
                 coords,
                 norm,
@@ -136,7 +134,10 @@ fn dbs(
     //TODO: make sure it starts at zero and is a range
     let n_classes = count_unique_elements(y.clone());
     // Get the norms
-    let norms: Vec<f64> = data.iter().map(|point| Dot::dot(point, point)).collect();
+    let norms: Vec<f64> = data
+        .iter()
+        .map(|point| linalg::ddot(point, point))
+        .collect();
     // Get  the max and min values
     let (dimensions, min_values, max_values) = dataset_dimensions_and_extremes(&data).unwrap();
     // Generate cover
