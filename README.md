@@ -1,8 +1,18 @@
-# Decision Boundary Sampler (DBS)
+<p align="center">
+  <img src='images/logo.png' width='200px' align="center"></img>
+</p>
 
-[![Downloads](https://pepy.tech/badge/dbsampler)](https://pepy.tech/project/dbsampler) [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/Antonio-Leitao/dbsampler/blob/main/LICENSE) [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-03a80e.svg)](https://github.com/Antonio-Leitao) [![version ](https://img.shields.io/badge/release-0.0.1-blue.svg)](https://pypi.org/project/dbsampler/) [![made-with-rust](https://img.shields.io/badge/Made%20with-Rust-000000.svg)](https://www.python.org/)
+<div align="center">
+<h3 max-width='200px' align="center">Decision Boundary Sampler</h3>
+  <p><i>Sample the decision boundary of classification problems<br/>
+  Blazingly fast and theoretically sound<br/>
+  Built with Rust</i><br/></p>
+  <p>
+    <img alt="Pepy Total Downlods" src="https://img.shields.io/pepy/dt/dbsampler?style=for-the-badge&logo=python&labelColor=white&color=blue">
+  </p>
+</div>
 
-<img src='images/logo.png' width='200px' align="right" style="float:right;margin-left:10pt"></img>
+#
 
 ### Contents
 - [Installation](#installation)
