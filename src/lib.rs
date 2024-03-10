@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+mod delauney;
 mod linalg;
 use anyhow::{anyhow, Result};
 use hashbrown::HashSet;
@@ -7,13 +8,13 @@ use rand::Rng;
 use rayon::prelude::*;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-struct Neighbours {
+pub struct Neighbours {
     first: usize,
     second: usize,
 }
 
 impl Neighbours {
-    fn new(a: usize, b: usize) -> Neighbours {
+    pub fn new(a: usize, b: usize) -> Neighbours {
         // Ensure the smaller value is stored in `first`
         if a < b {
             Neighbours {
@@ -69,7 +70,9 @@ fn generate_uniform_points(
     Ok(cover)
 }
 
-fn dataset_dimensions_and_extremes(dataset: &[Vec<f64>]) -> Result<(usize, Vec<f64>, Vec<f64>)> {
+pub fn dataset_dimensions_and_extremes(
+    dataset: &[Vec<f64>],
+) -> Result<(usize, Vec<f64>, Vec<f64>)> {
     let mut min_values: Vec<f64>;
     let mut max_values: Vec<f64>;
     let dimensions = match dataset.first() {
@@ -119,38 +122,6 @@ fn closest_neighbours(
 fn count_unique_elements(vec: Vec<usize>) -> usize {
     let unique_elements: IntSet<usize> = vec.into_iter().collect();
     unique_elements.len()
-}
-
-#[pyfunction]
-#[pyo3(signature = (data,y, n_points=1000, parallel=false,sparse=false))]
-fn dbs(
-    data: Vec<Vec<f64>>,
-    y: Vec<usize>,
-    n_points: usize,
-    parallel: bool,
-    sparse: bool,
-) -> PyResult<Vec<Vec<f64>>> {
-    //get number of classes
-    //TODO: make sure it starts at zero and is a range
-    let n_classes = count_unique_elements(y.clone());
-    // Get the norms
-    let norms: Vec<f64> = data
-        .iter()
-        .map(|point| linalg::ddot(point, point))
-        .collect();
-    // Get  the max and min values
-    let (dimensions, min_values, max_values) = dataset_dimensions_and_extremes(&data).unwrap();
-    // Generate cover
-    let mut cover = generate_uniform_points(n_points, dimensions, min_values, max_values).unwrap();
-    if parallel {
-        core_loop_parallel(&data, &y, n_classes, &norms, &mut cover);
-    } else {
-        core_loop(&data, &y, n_classes, &norms, &mut cover);
-    }
-    if sparse {
-        distill(&mut cover);
-    }
-    Ok(cover.into_iter().map(|point| point.coords).collect())
 }
 
 fn core_loop(
@@ -231,9 +202,52 @@ fn distill(cover: &mut Vec<Point>) {
     });
 }
 
+#[pyfunction]
+#[pyo3(signature = (data,y, n_points=1000, parallel=false,sparse=false))]
+fn dbs(
+    data: Vec<Vec<f64>>,
+    y: Vec<usize>,
+    n_points: usize,
+    parallel: bool,
+    sparse: bool,
+) -> PyResult<Vec<Vec<f64>>> {
+    //get number of classes
+    //TODO: make sure it starts at zero and is a range
+    let n_classes = count_unique_elements(y.clone());
+    // Get the norms
+    let norms: Vec<f64> = data
+        .iter()
+        .map(|point| linalg::ddot(point, point))
+        .collect();
+    // Get  the max and min values
+    let (dimensions, min_values, max_values) = dataset_dimensions_and_extremes(&data).unwrap();
+    // Generate cover
+    let mut cover = generate_uniform_points(n_points, dimensions, min_values, max_values).unwrap();
+    if parallel {
+        core_loop_parallel(&data, &y, n_classes, &norms, &mut cover);
+    } else {
+        core_loop(&data, &y, n_classes, &norms, &mut cover);
+    }
+    if sparse {
+        distill(&mut cover);
+    }
+    Ok(cover.into_iter().map(|point| point.coords).collect())
+}
+
+//NEEDS TO ADD MORE SLACK TO GET CONVEX HULL
+#[pyfunction]
+#[pyo3(signature = (data,n_points=1000, parallel=true))]
+fn delaunay(data: Vec<Vec<f64>>, n_points: usize, parallel: bool) -> PyResult<Vec<(usize, usize)>> {
+    if parallel {
+        Ok(delauney::core_loop(data, n_points))
+    } else {
+        Ok(delauney::core_loop_parallel(data, n_points))
+    }
+}
 /// A Python module implemented in Rust.
 #[pymodule]
 fn dbsampler(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dbs, m)?)?;
+    m.add_function(wrap_pyfunction!(delaunay, m)?)?;
     Ok(())
 }

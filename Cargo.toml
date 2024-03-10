@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1.0.79"
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["rayon"] }
 nohash-hasher = "0.2.0"
 pyo3 = "0.18.1"
 rand = "0.8.5"
