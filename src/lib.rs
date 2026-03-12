@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+mod blas_ops;
 mod linalg;
 use anyhow::{anyhow, Result};
 use hashbrown::HashSet;
@@ -238,4 +239,228 @@ fn dbs(
 fn dbsampler(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dbs, m)?)?;
     Ok(())
+}
+
+fn generate_random_points(k: usize, d: usize, a_matrix: &[f32]) -> Vec<f32> {
+    let mut rng = rand::thread_rng();
+
+    // Find per-dimension min/max
+    let mut mins = vec![f32::INFINITY; d];
+    let mut maxs = vec![f32::NEG_INFINITY; d];
+    for row in a_matrix.chunks_exact(d) {
+        for (dim, &val) in row.iter().enumerate() {
+            if val < mins[dim] {
+                mins[dim] = val;
+            }
+            if val > maxs[dim] {
+                maxs[dim] = val;
+            }
+        }
+    }
+
+    // Generate k points uniformly in the bounding box
+    let mut x = vec![0.0f32; k * d];
+    for point in x.chunks_exact_mut(d) {
+        for (dim, val) in point.iter_mut().enumerate() {
+            *val = rng.gen_range(mins[dim]..=maxs[dim]);
+        }
+    }
+    x
+}
+pub fn dbs_core(k: usize, n: usize, d: usize, a_matrix: &[f32], labels: &[usize]) {
+    // 1. Precompute ||a_j||^2
+    let a_norms = blas_ops::row_norms_sq(n, d, a_matrix);
+    let mut x_matrix = generate_random_points(k, d, &a_matrix);
+    let mut s_matrix = vec![0.0; k * n];
+    let inertia = full_iteration(
+        k,
+        n,
+        d,
+        &mut x_matrix,
+        &a_matrix,
+        &a_norms,
+        labels,
+        &mut s_matrix,
+    );
+}
+
+/// Computes the projection of each point in X onto the bisecting hyperplane
+/// of its two nearest neighbors of different classes in A.
+///
+/// Returns the Mean Squared Displacement across all k query points.
+pub fn full_iteration(
+    k: usize,
+    n: usize,
+    d: usize,
+    x_matrix: &mut [f32],
+    a_matrix: &[f32],
+    a_norms: &[f32],
+    labels: &[usize],
+    s_matrix: &mut [f32],
+) -> f32 {
+    let mut total_sq_movement = 0.0f32;
+
+    // Precompute half-norms once (avoids k*n redundant multiplies by 0.5)
+    let half_norms = blas_ops::half_row_norms_sq(a_norms);
+
+    // S = X * A^T  (one batched GEMM)
+    blas_ops::compute_xat_dot_products(k, n, d, x_matrix, a_matrix, s_matrix);
+
+    // Process each query point
+    for (x_row, s_row) in x_matrix.chunks_exact_mut(d).zip(s_matrix.chunks_exact(n)) {
+        let mut best_score_1 = f32::NEG_INFINITY;
+        let mut best_score_2 = f32::NEG_INFINITY;
+        let mut idx_1 = 0usize;
+        let mut idx_2 = 0usize;
+        let mut class_1 = usize::MAX;
+
+        // --- STEP A: Find two nearest neighbors of different classes ---
+        for j in 0..n {
+            let score = s_row[j] - half_norms[j];
+            if score > best_score_1 {
+                if labels[j] != class_1 {
+                    best_score_2 = best_score_1;
+                    idx_2 = idx_1;
+                }
+                best_score_1 = score;
+                idx_1 = j;
+                class_1 = labels[j];
+            } else if score > best_score_2 && labels[j] != class_1 {
+                best_score_2 = score;
+                idx_2 = j;
+            }
+        }
+
+        if best_score_2 == f32::NEG_INFINITY {
+            continue;
+        }
+
+        // --- STEP B: dot(a1, a2) via BLAS ---
+        let dot_12 = blas_ops::dot_rows(a_matrix, d, idx_1, idx_2);
+
+        // --- STEP C: Scalar projection factor ---
+        let dot_x1 = s_row[idx_1];
+        let dot_x2 = s_row[idx_2];
+        let norm_1 = a_norms[idx_1];
+        let norm_2 = a_norms[idx_2];
+
+        let num = dot_x2 - dot_x1 - 0.5 * (norm_2 - norm_1);
+        let den = norm_1 + norm_2 - 2.0 * dot_12;
+        let s = num / (den + 1e-12);
+
+        total_sq_movement += s * s * den;
+
+        // --- STEP D: x -= s*(a2 - a1) via two SAXPY calls ---
+        blas_ops::axpy_row(x_row, s, a_matrix, d, idx_1); // x += s * a1
+        blas_ops::axpy_row(x_row, -s, a_matrix, d, idx_2); // x -= s * a2
+    }
+
+    total_sq_movement / (k as f32)
+}
+
+/// Tiled iteration that processes A in column-chunks to keep S_partial in cache.
+///
+/// Instead of materializing the full (k × n) dot-product matrix S, we compute
+/// S_partial = X * A_chunk^T for each chunk, immediately scan it to update
+/// running nearest-neighbor candidates, then discard it. This avoids a
+/// multi-GB DRAM round-trip for large n.
+///
+/// Returns the Mean Squared Displacement across all k query points.
+pub fn chunked_iteration(
+    k: usize,
+    n: usize,
+    d: usize,
+    x_matrix: &mut [f32],
+    a_matrix: &[f32],
+    a_norms: &[f32],
+    labels: &[usize],
+    chunk_size: usize,
+) -> f32 {
+    let half_norms = blas_ops::half_row_norms_sq(a_norms);
+
+    // Per-query running state for the two-nearest-of-different-classes search
+    let mut best_score_1 = vec![f32::NEG_INFINITY; k];
+    let mut best_score_2 = vec![f32::NEG_INFINITY; k];
+    let mut idx_1 = vec![0usize; k];
+    let mut idx_2 = vec![0usize; k];
+    let mut class_1 = vec![usize::MAX; k];
+
+    // Reusable buffer — this is the whole point: k * chunk_size fits in cache
+    let mut s_partial = vec![0.0f32; k * chunk_size];
+
+    // ========== PHASE 1: Tiled search ==========
+    let mut j_start = 0;
+    while j_start < n {
+        let j_end = (j_start + chunk_size).min(n);
+        let cur_chunk = j_end - j_start;
+
+        // S_partial = X * A[j_start..j_end]^T
+        // A rows are contiguous in memory so slicing works directly
+        let a_chunk = &a_matrix[j_start * d..j_end * d];
+        blas_ops::compute_xat_dot_products(
+            k,
+            cur_chunk,
+            d,
+            x_matrix,
+            a_chunk,
+            &mut s_partial[..k * cur_chunk],
+        );
+
+        // Scan partial scores and update running best-2 per query
+        for i in 0..k {
+            let s_row = &s_partial[i * cur_chunk..(i + 1) * cur_chunk];
+            for local_j in 0..cur_chunk {
+                let global_j = j_start + local_j;
+                let score = s_row[local_j] - half_norms[global_j];
+
+                if score > best_score_1[i] {
+                    if labels[global_j] != class_1[i] {
+                        // New best is a different class — demote old best to second
+                        best_score_2[i] = best_score_1[i];
+                        idx_2[i] = idx_1[i];
+                    }
+                    best_score_1[i] = score;
+                    idx_1[i] = global_j;
+                    class_1[i] = labels[global_j];
+                } else if score > best_score_2[i] && labels[global_j] != class_1[i] {
+                    best_score_2[i] = score;
+                    idx_2[i] = global_j;
+                }
+            }
+        }
+
+        j_start = j_end;
+    }
+
+    // ========== PHASE 2: Projection ==========
+    let mut total_sq_movement = 0.0f32;
+
+    for (i, x_row) in x_matrix.chunks_exact_mut(d).enumerate() {
+        if best_score_2[i] == f32::NEG_INFINITY {
+            continue;
+        }
+
+        // Recover raw dot products from stored scores:
+        //   score_j = (x · a_j) - half_norm_j
+        //   => x · a_j = score_j + half_norm_j
+        let dot_x1 = best_score_1[i] + half_norms[idx_1[i]];
+        let dot_x2 = best_score_2[i] + half_norms[idx_2[i]];
+
+        let dot_12 = blas_ops::dot_rows(a_matrix, d, idx_1[i], idx_2[i]);
+
+        let norm_1 = a_norms[idx_1[i]];
+        let norm_2 = a_norms[idx_2[i]];
+
+        let num = dot_x2 - dot_x1 - 0.5 * (norm_2 - norm_1);
+        let den = norm_1 + norm_2 - 2.0 * dot_12;
+        let s = num / (den + 1e-12);
+
+        total_sq_movement += s * s * den;
+
+        // x -= s * (a2 - a1) via two SAXPY calls
+        blas_ops::axpy_row(x_row, s, a_matrix, d, idx_1[i]); // x += s * a1
+        blas_ops::axpy_row(x_row, -s, a_matrix, d, idx_2[i]); // x -= s * a2
+    }
+
+    total_sq_movement / (k as f32)
 }
