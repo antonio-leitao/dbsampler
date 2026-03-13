@@ -14,7 +14,7 @@ numpy = "0.28.0"
 rand = "0.8.5"
 cblas-sys = "0.1"
 rayon = "1.10"
-# --- BLAS backend (platform-specific) ---
+
 [target.'cfg(target_os = "macos")'.dependencies]
 blas-src = { version = "0.10", features = ["accelerate"] }
 
@@ -24,5 +24,4 @@ openblas-src = { version = "0.10", features = ["cblas", "static"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 blas-src = { version = "0.10", features = ["openblas"] }
-openblas-src = { version = "0.10", features = ["cblas", "static"] }
-
+openblas-src = { version = "0.10", features = ["cblas", "system"] }
