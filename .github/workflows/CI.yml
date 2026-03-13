@@ -1,5 +1,5 @@
 # This file is based on maturin generate-ci github,
-# updated for OpenBLAS static compilation and Actions v4.
+# updated for OpenBLAS compilation (vcpkg on Windows, OpenSSL on Linux) and Actions v4.
 name: CI
 
 on:
@@ -35,11 +35,11 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: "true"
           manylinux: auto
-          # Install Perl and Fortran inside the manylinux container before building
+          # Install Perl, Fortran, and OpenSSL headers inside the manylinux container
           before-script-linux: |
-            if command -v yum &> /dev/null; then yum install -y perl gcc-gfortran; fi
-            if command -v apt-get &> /dev/null; then apt-get update && apt-get install -y perl gfortran; fi
-            if command -v apk &> /dev/null; then apk add perl gfortran; fi
+            if command -v yum &> /dev/null; then yum install -y perl gcc-gfortran openssl-devel pkgconfig; fi
+            if command -v apt-get &> /dev/null; then apt-get update && apt-get install -y perl gfortran libssl-dev pkg-config; fi
+            if command -v apk &> /dev/null; then apk add perl gfortran openssl-dev pkgconfig; fi
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -48,6 +48,9 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    env:
+      # Tell the Rust vcpkg crate where to find the GitHub Actions vcpkg installation
+      VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
     strategy:
       fail-fast: false
       matrix:
@@ -58,6 +61,9 @@ jobs:
         with:
           python-version: "3.10"
           architecture: ${{ matrix.target }}
+      - name: Install OpenBLAS via vcpkg
+        # Use static compilation for the library, but dynamic for the C-Runtime (md)
+        run: vcpkg install openblas:${{ matrix.target }}-windows-static-md
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -114,7 +120,6 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [linux, windows, macos, sdist]
     steps:
-      # Download all artifacts matching 'wheels-*' and merge them into the dist folder
       - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*

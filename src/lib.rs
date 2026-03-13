@@ -1,9 +1,8 @@
 extern crate blas_src;
-use pyo3::prelude::*;
-use std::collections::HashMap;
-mod linalg;
 use numpy::PyReadonlyArray2;
+use pyo3::prelude::*;
 use rand::Rng;
+use std::collections::HashMap;
 // use rayon::prelude::*;
 mod blas_ops;
 
