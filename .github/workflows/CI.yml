@@ -48,28 +48,32 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    env:
-      # Tell the Rust vcpkg crate where to find the GitHub Actions vcpkg installation
-      VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
     strategy:
       fail-fast: false
       matrix:
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v4
+
+      # FIX: Dynamically set VCPKG_ROOT after the runner has initialized
+      - name: Set VCPKG_ROOT
+        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           architecture: ${{ matrix.target }}
+
       - name: Install OpenBLAS via vcpkg
-        # Use static compilation for the library, but dynamic for the C-Runtime (md)
         run: vcpkg install openblas:${{ matrix.target }}-windows-static-md
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: "true"
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
