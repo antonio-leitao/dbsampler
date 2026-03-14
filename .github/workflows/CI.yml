@@ -1,5 +1,3 @@
-# This file is based on maturin generate-ci github,
-# updated for OpenBLAS compilation (vcpkg on Windows, OpenSSL on Linux) and Actions v4.
 name: CI
 
 on:
@@ -18,11 +16,15 @@ permissions:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64, aarch64]
+        include:
+          - target: x86_64
+            runner: ubuntu-latest
+          - target: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,50 +36,43 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: "true"
-          manylinux: auto
+          # Use manylinux_2_28 (AlmaLinux 8) — ships OpenSSL 1.1.1 and modern toolchains
+          manylinux: "2_28"
           before-script-linux: |
-            if command -v yum &> /dev/null; then
-              yum install -y perl gcc-gfortran openssl-devel pkgconfig
-            fi
-            if command -v apt-get &> /dev/null; then
-              apt-get update && apt-get install -y perl gfortran libssl-dev pkg-config
-            fi
-            if command -v apk &> /dev/null; then
-              apk add perl gfortran openssl-dev pkgconfig
-            fi
+            yum install -y perl gcc-gfortran openssl-devel pkgconfig
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist
 
   windows:
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x64, x86]
     steps:
       - uses: actions/checkout@v4
 
-      # FIX: Dynamically set VCPKG_ROOT after the runner has initialized
       - name: Set VCPKG_ROOT
         run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          architecture: ${{ matrix.target }}
+          architecture: x64
 
       - name: Install OpenBLAS via vcpkg
-        run: vcpkg install openblas:${{ matrix.target }}-windows-static-md
+        run: vcpkg install openblas:x64-windows-static-md
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: x64
           args: --release --out dist --find-interpreter
           sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-${{ matrix.target }}
+          name: wheels-windows-x64
           path: dist
 
   macos:
