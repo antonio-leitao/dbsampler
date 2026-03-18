@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "dbsampler"
+version = "0.3.0"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
@@ -22,4 +23,12 @@ repository = "https://github.com/antonio-leitao/dbsampler"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+]
 
