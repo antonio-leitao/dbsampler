@@ -1,14 +1,18 @@
 <p align="center">
-  <img src="images/logo.png" />
+  <img src='images/logo.png' width='200px' align="center"></img>
 </p>
 
-### Decision Boundary Sampler
+<div align="center">
+<h3 max-width='200px' align="center">Decision Boundary Sampler</h3>
+  <p><i>Sample the decision boundary of classification problems<br/>
+  Blazingly fast and theoretically sound<br/>
+  Built with Rust</i><br/></p>
+  <p>
+    <img alt="Pepy Total Downlods" src="https://img.shields.io/pepy/dt/dbsampler?style=for-the-badge&logo=python&labelColor=white&color=blue">
+  </p>
+</div>
 
-_Sample the decision boundary of classification problems
-Blazingly fast and theoretically sound
-Built with Rust_
-
-[![Pepy Total Downlods](https://img.shields.io/pepy/dt/dbsampler?style=for-the-badge&logo=python&labelColor=white&color=blue)](https://pepy.tech/project/dbsampler)
+#
 
 ### Contents
 
@@ -21,8 +25,8 @@ Built with Rust_
 - [Citing](#citing)
 
 <p align="center">
-  <img src="images/linear.png" width="49%" />
-  <img src="images/concentric.png" width="49%" />
+  <img src="images/linear.png"/>
+  <img src="images/concentric.png"/>
 </p>
 
 DBSampler is a package to sample points on the decision boundary of classification problems (binary or multiclass). It is theoretically exact and efficient for very high dimensions. The guarantees:
@@ -96,8 +100,8 @@ This can drastically reduce the number of points while maintaining a uniform and
 Below is the example of `5000` points sampled (left) and the same points with `sparse=True`.
 
 <p align="center">
-  <img src="images/dense.png" width="49%" />
-  <img src="images/sparse.png" width="49%" />
+  <img src="images/dense.png" width="350"/>
+  <img src="images/sparse.png" width="350"/>
 </p>
 
 ## How does it work?
@@ -105,13 +109,13 @@ Below is the example of `5000` points sampled (left) and the same points with `s
 For an in-depth explanation check our [paper](https://openreview.net/forum?id=I44kJPuvqPD). The algorithm aims to uniformly sample points from the edges of Voronoi cells belonging to points of different classes. The union of these edges forms the decision boundary that maximizes the distance between classes.
 
 <p align="center">
-  <img src="images/voronoi.png" width="60%" />
+  <img src="images/voronoi.png" width="300" />
 </p>
 
 It starts by building an initial uniform sample of the space containing `n_points`. It then iteratively projects each point onto the bisecting hyperplane between its two nearest neighbors of different classes.
 
 <p align="center">
-  <img src="images/voronoiboudary.png" width="60%" />
+  <img src="images/voronoiboudary.png" width="300" />
 </p>
 
 **Sketch of proof of convergence.** At each iteration:
@@ -120,10 +124,10 @@ It starts by building an initial uniform sample of the space containing `n_point
 2. Otherwise there must exist a point from class A (or not A) that becomes the new nearest neighbour (by definition of Voronoi cells).
 
 <p align="center">
-  <img src="images/linear_0.png" width="24%" />
-  <img src="images/linear_1.png" width="24%" />
-  <img src="images/linear_2.png" width="24%" />
-  <img src="images/linear.png" width="24%" />
+  <img src="images/linear_0.png" width="200"/>
+  <img src="images/linear_1.png" width="200"/>
+  <img src="images/linear_2.png" width="200"/>
+  <img src="images/linear.png" width="200"/>
 </p>
 
 ## Performance
@@ -135,7 +139,7 @@ With `parallel=True`, the per-point nearest-neighbor search and bisector project
 Pre-built binaries are available for Windows, macOS and most Linux distributions.
 
 <p align="center">
-  <img src="images/performance.png" width="80%" />
+  <img src="images/performance.png"/>
 </p>
 
 ## Citing
