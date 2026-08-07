@@ -4,16 +4,20 @@ use pyo3::prelude::*;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 mod blas_ops;
+mod validation;
+
+#[cfg(test)]
+mod tests;
 
 /// Decision Boundary Sampling.
 ///
 /// Parameters
 /// ----------
 /// data : np.ndarray, shape (n, d)
-///     The dataset, float64. Converted internally to float32.
+///     The dataset, float32 or float64. Computed internally in float32.
 /// y : list[int] or np.ndarray
 ///     Class labels per data point, length n.
 /// n_points : int, default 1000
@@ -21,9 +25,9 @@ mod blas_ops;
 /// max_iter : int, default 100
 ///     Maximum number of iterations.
 /// tol : float, default 1e-6
-///     Convergence threshold on mean squared displacement.
+///     Per-point convergence threshold on squared displacement.
 /// sparse : bool, default True
-///     If True, deduplicate points sharing the same boundary.
+///     If True, keep one converged point per neighboring data pair.
 /// parallel : bool, default True
 ///     If True, use rayon parallelism for per-point projection.
 /// seed : int or None, default None
@@ -32,13 +36,13 @@ mod blas_ops;
 /// Returns
 /// -------
 /// list[list[float]]
-///     Converged boundary points, each of length d.
+///     Sampled boundary points, each of length d.
 #[pyfunction(name = "dbs")]
 #[pyo3(signature = (data, y, n_points=1000, max_iter=100, tol=1e-6, sparse=true, parallel=true, seed=None))]
 fn dbs_py(
     py: Python<'_>,
-    data: PyReadonlyArray2<f64>,
-    y: Vec<usize>,
+    data: &Bound<'_, PyAny>,
+    y: Vec<i64>,
     n_points: usize,
     max_iter: usize,
     tol: f64,
@@ -46,34 +50,48 @@ fn dbs_py(
     parallel: bool,
     seed: Option<u64>,
 ) -> PyResult<Vec<Vec<f32>>> {
-    let arr = data.as_array();
-    let n = arr.nrows();
-    let d = arr.ncols();
-
-    if y.len() != n {
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "y has length {} but data has {} rows",
-            y.len(),
-            n
-        )));
+    let prepared = if let Ok(array) = data.extract::<PyReadonlyArray2<f32>>() {
+        validation::prepare(array.as_array(), &y, n_points, max_iter, tol)
+    } else if let Ok(array) = data.extract::<PyReadonlyArray2<f64>>() {
+        validation::prepare(array.as_array(), &y, n_points, max_iter, tol)
+    } else {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "data must be a two-dimensional NumPy array with dtype float32 or float64",
+        ));
     }
+    .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
-    // Convert f64 → f32 and ensure contiguous row-major layout.
-    let a_contiguous = arr.as_standard_layout();
-    let a_flat: Vec<f32> = a_contiguous.iter().map(|&v| v as f32).collect();
-    let tol_f32 = tol as f32;
+    let n = prepared.n;
+    let d = prepared.d;
+    let center = prepared.center;
+    let scale = prepared.scale;
 
     // Run the algorithm entirely GIL-free.
     let result = py.detach(move || {
         dbs_core(
-            n_points, n, d, &a_flat, &y, max_iter, tol_f32, sparse, parallel, seed,
+            n_points,
+            n,
+            d,
+            &prepared.data,
+            &prepared.labels,
+            max_iter,
+            prepared.tolerance,
+            sparse,
+            parallel,
+            seed,
         )
     });
 
     let x_py: Vec<Vec<f32>> = result
         .x_matrix
         .chunks(d)
-        .map(|chunk| chunk.to_vec())
+        .map(|chunk| {
+            chunk
+                .iter()
+                .enumerate()
+                .map(|(dim, &value)| (value as f64 * scale + center[dim]) as f32)
+                .collect()
+        })
         .collect();
 
     Ok(x_py)
@@ -96,21 +114,23 @@ pub struct IterationResult {
     /// For each query point, the two nearest neighbors of different classes,
     /// stored as (min_idx, max_idx) so that pair order is canonical.
     pub pairs: Vec<[usize; 2]>,
+    /// Whether each query point has met the per-point stopping condition.
+    pub finished: Vec<bool>,
 }
 
 /// Final output of the DBS algorithm.
 pub struct DbsResult {
-    /// Converged (and optionally deduplicated) query points, flat (m × d).
+    /// Final (and optionally deduplicated) query points, flat (m × d).
     pub x_matrix: Vec<f32>,
     /// Canonical neighbor pairs per point.
     pub pairs: Vec<[usize; 2]>,
     /// Number of points (may be < k after dedup).
     pub m: usize,
-    /// Final inertia (mean squared displacement) at convergence.
+    /// Mean squared displacement in the final iteration.
     pub final_inertia: f32,
     /// Number of iterations actually run.
     pub iterations: usize,
-    /// Whether the algorithm converged within tolerance.
+    /// Whether every point converged within tolerance.
     pub converged: bool,
 }
 
@@ -133,7 +153,7 @@ const CHUNK_SIZE: usize = 1024;
 /// - `a_matrix`: data matrix, row-major (n × d)
 /// - `labels`: class label per data point (length n)
 /// - `max_iterations`: hard cap on iterations
-/// - `tol`: convergence threshold on inertia (mean squared displacement)
+/// - `tol`: per-point threshold on squared displacement
 /// - `distill`: if true, deduplicate points sharing the same boundary
 /// - `parallel`: if true, use rayon for per-point work
 /// - `seed`: optional random seed for reproducibility
@@ -167,10 +187,11 @@ pub fn dbs_core(
         vec![0.0f32; k * n]
     };
 
-    // 4. Iterate until convergence or max_iterations
+    // 4. Iterate until every point is finished or max_iterations
     let mut last_result = IterationResult {
         inertia: f32::INFINITY,
-        pairs: Vec::new(),
+        pairs: vec![[usize::MAX, usize::MAX]; k],
+        finished: vec![false; k],
     };
     let mut converged = false;
     let mut iters_run = 0;
@@ -183,11 +204,13 @@ pub fn dbs_core(
                 d,
                 &mut x_matrix,
                 a_matrix,
-                &a_norms,
                 &half_norms,
                 labels,
                 CHUNK_SIZE,
                 parallel,
+                &last_result.pairs,
+                &last_result.finished,
+                tol,
             )
         } else {
             full_iteration(
@@ -196,27 +219,29 @@ pub fn dbs_core(
                 d,
                 &mut x_matrix,
                 a_matrix,
-                &a_norms,
                 &half_norms,
                 labels,
                 &mut s_matrix,
                 parallel,
+                &last_result.pairs,
+                &last_result.finished,
+                tol,
             )
         };
 
         iters_run = iter + 1;
-        let inertia = result.inertia;
+        converged = result.finished.iter().all(|&finished| finished);
         last_result = result;
 
-        if inertia < tol {
-            converged = true;
+        if converged {
             break;
         }
     }
 
     // 5. Optionally distill (deduplicate)
     if distill {
-        let (deduped_x, deduped_pairs) = dedup_points(&x_matrix, d, &last_result.pairs);
+        let (deduped_x, deduped_pairs) =
+            dedup_points(&x_matrix, d, &last_result.pairs, &last_result.finished);
         let m = deduped_pairs.len();
         DbsResult {
             x_matrix: deduped_x,
@@ -284,12 +309,6 @@ fn canonical_pair(a: usize, b: usize) -> [usize; 2] {
     }
 }
 
-/// Packs a canonical pair into a single u64 for hashing.
-#[inline]
-fn pack_pair(pair: [usize; 2]) -> u64 {
-    (pair[0] as u64) << 32 | pair[1] as u64
-}
-
 /// Finds the two nearest neighbors of different classes for a single query,
 /// given an iterator of (global_index, score) pairs.
 ///
@@ -329,33 +348,38 @@ fn find_two_nearest(
 
 /// Projects x onto the bisecting hyperplane of a[idx_1] and a[idx_2].
 /// Returns the squared displacement.
-///
-/// NOTE: `dot_x1` and `dot_x2` must be the *raw* dot products x·a[idx],
-/// i.e. the sgemm output before any half-norm subtraction.
 #[inline]
 fn project_onto_bisector(
     x_row: &mut [f32],
     a_matrix: &[f32],
-    a_norms: &[f32],
     d: usize,
     idx_1: usize,
     idx_2: usize,
-    dot_x1: f32,
-    dot_x2: f32,
 ) -> f32 {
-    let dot_12 = blas_ops::dot_rows(a_matrix, d, idx_1, idx_2);
+    let a_1 = &a_matrix[idx_1 * d..(idx_1 + 1) * d];
+    let a_2 = &a_matrix[idx_2 * d..(idx_2 + 1) * d];
+    let mut numerator = 0.0f64;
+    let mut denominator = 0.0f64;
 
-    let norm_1 = a_norms[idx_1];
-    let norm_2 = a_norms[idx_2];
+    for dim in 0..d {
+        let difference = a_2[dim] as f64 - a_1[dim] as f64;
+        let midpoint = a_1[dim] as f64 + 0.5 * difference;
+        numerator += (x_row[dim] as f64 - midpoint) * difference;
+        denominator += difference * difference;
+    }
 
-    let num = dot_x2 - dot_x1 - 0.5 * (norm_2 - norm_1);
-    let den = norm_1 + norm_2 - 2.0 * dot_12;
-    let s = num / (den + 1e-12);
+    debug_assert!(denominator > 0.0);
+    if denominator == 0.0 {
+        return f32::INFINITY;
+    }
 
-    blas_ops::axpy_row(x_row, s, a_matrix, d, idx_1); // x += s * a1
-    blas_ops::axpy_row(x_row, -s, a_matrix, d, idx_2); // x -= s * a2
+    let scale = numerator / denominator;
+    for dim in 0..d {
+        let difference = a_2[dim] as f64 - a_1[dim] as f64;
+        x_row[dim] = (x_row[dim] as f64 - scale * difference) as f32;
+    }
 
-    s * s * den
+    (scale * scale * denominator) as f32
 }
 
 /// Per-query-point work shared by both iteration paths:
@@ -367,31 +391,28 @@ fn process_query_point(
     x_row: &mut [f32],
     s_row: &[f32],
     a_matrix: &[f32],
-    a_norms: &[f32],
     half_norms: &[f32],
     labels: &[usize],
     d: usize,
     n: usize,
-) -> (f32, [usize; 2]) {
+    previous_pair: [usize; 2],
+    tolerance: f32,
+) -> (f32, [usize; 2], bool) {
     let scores = (0..n).map(|j| (j, s_row[j] - half_norms[j]));
 
     let Some((idx_1, idx_2, _, _)) = find_two_nearest(scores, labels) else {
-        return (0.0, [0, 0]);
+        return (f32::INFINITY, [usize::MAX, usize::MAX], false);
     };
+    let pair = canonical_pair(idx_1, idx_2);
 
-    // s_row[idx] is the raw dot product x·a[idx] (sgemm output)
-    let sq_disp = project_onto_bisector(
-        x_row,
-        a_matrix,
-        a_norms,
-        d,
-        idx_1,
-        idx_2,
-        s_row[idx_1],
-        s_row[idx_2],
-    );
+    // The previous iteration already put x on this pair's bisector.
+    if pair == previous_pair {
+        return (0.0, pair, true);
+    }
 
-    (sq_disp, canonical_pair(idx_1, idx_2))
+    let sq_disp = project_onto_bisector(x_row, a_matrix, d, idx_1, idx_2);
+
+    (sq_disp, pair, sq_disp <= tolerance)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -407,14 +428,14 @@ pub fn dedup_points(
     x_matrix: &[f32],
     d: usize,
     pairs: &[[usize; 2]],
+    finished: &[bool],
 ) -> (Vec<f32>, Vec<[usize; 2]>) {
-    let mut seen = HashMap::new();
+    let mut seen = HashSet::new();
     let mut unique_x = Vec::new();
     let mut unique_pairs = Vec::new();
 
     for (i, pair) in pairs.iter().enumerate() {
-        let key = pack_pair(*pair);
-        if seen.insert(key, i).is_none() {
+        if finished[i] && seen.insert(*pair) {
             let start = i * d;
             unique_x.extend_from_slice(&x_matrix[start..start + d]);
             unique_pairs.push(*pair);
@@ -434,44 +455,77 @@ pub fn full_iteration(
     d: usize,
     x_matrix: &mut [f32],
     a_matrix: &[f32],
-    a_norms: &[f32],
     half_norms: &[f32],
     labels: &[usize],
     s_matrix: &mut [f32],
     parallel: bool,
+    previous_pairs: &[[usize; 2]],
+    finished: &[bool],
+    tolerance: f32,
 ) -> IterationResult {
     // Bulk matrix multiply: S = X * A^T (BLAS handles its own threading)
     blas_ops::compute_xat_dot_products(k, n, d, x_matrix, a_matrix, s_matrix);
 
     // Per-point: find nearest pair + project onto bisector
-    let results: Vec<(f32, [usize; 2])> = if parallel {
+    let results: Vec<(f32, [usize; 2], bool)> = if parallel {
         x_matrix
             .par_chunks_exact_mut(d)
             .zip(s_matrix.par_chunks_exact(n))
-            .map(|(x_row, s_row)| {
-                process_query_point(x_row, s_row, a_matrix, a_norms, half_norms, labels, d, n)
+            .enumerate()
+            .map(|(index, (x_row, s_row))| {
+                if finished[index] {
+                    return (0.0, previous_pairs[index], true);
+                }
+                process_query_point(
+                    x_row,
+                    s_row,
+                    a_matrix,
+                    half_norms,
+                    labels,
+                    d,
+                    n,
+                    previous_pairs[index],
+                    tolerance,
+                )
             })
             .collect()
     } else {
         x_matrix
             .chunks_exact_mut(d)
             .zip(s_matrix.chunks_exact(n))
-            .map(|(x_row, s_row)| {
-                process_query_point(x_row, s_row, a_matrix, a_norms, half_norms, labels, d, n)
+            .enumerate()
+            .map(|(index, (x_row, s_row))| {
+                if finished[index] {
+                    return (0.0, previous_pairs[index], true);
+                }
+                process_query_point(
+                    x_row,
+                    s_row,
+                    a_matrix,
+                    half_norms,
+                    labels,
+                    d,
+                    n,
+                    previous_pairs[index],
+                    tolerance,
+                )
             })
             .collect()
     };
 
     let mut total_sq_movement = 0.0f32;
     let mut pairs = Vec::with_capacity(k);
-    for (sq, pair) in results {
+    let mut next_finished = Vec::with_capacity(k);
+    for (sq, pair, point_finished) in results {
         total_sq_movement += sq;
         pairs.push(pair);
+        next_finished.push(point_finished);
     }
 
     IterationResult {
         inertia: total_sq_movement / k as f32,
         pairs,
+        finished: next_finished,
     }
 }
 
@@ -525,14 +579,16 @@ pub fn chunked_iteration(
     d: usize,
     x_matrix: &mut [f32],
     a_matrix: &[f32],
-    a_norms: &[f32],
     half_norms: &[f32],
     labels: &[usize],
     chunk_size: usize,
     parallel: bool,
+    previous_pairs: &[[usize; 2]],
+    finished: &[bool],
+    tolerance: f32,
 ) -> IterationResult {
     let mut states: Vec<QueryState> = (0..k).map(|_| QueryState::default()).collect();
-    let mut s_partial = vec![0.0f32; k * chunk_size];
+    let mut s_partial = vec![0.0f32; k * chunk_size.min(n)];
 
     // ── Phase 1: Tiled nearest-neighbor search ──
     let mut j_start = 0;
@@ -552,6 +608,9 @@ pub fn chunked_iteration(
 
         if parallel {
             states.par_iter_mut().enumerate().for_each(|(i, state)| {
+                if finished[i] {
+                    return;
+                }
                 let s_row = &s_partial[i * cur_chunk..(i + 1) * cur_chunk];
                 for local_j in 0..cur_chunk {
                     let global_j = j_start + local_j;
@@ -561,6 +620,9 @@ pub fn chunked_iteration(
             });
         } else {
             for i in 0..k {
+                if finished[i] {
+                    continue;
+                }
                 let s_row = &s_partial[i * cur_chunk..(i + 1) * cur_chunk];
                 for local_j in 0..cur_chunk {
                     let global_j = j_start + local_j;
@@ -574,57 +636,60 @@ pub fn chunked_iteration(
     }
 
     // ── Phase 2: Projection ──
-    // Build per-point inputs from the accumulated states, then project.
-    // We need (idx_1, idx_2, raw_dot_x1, raw_dot_x2) per query point.
-    // Raw dot = score + half_norm (undoing the subtraction from phase 1).
-    let phase2_inputs: Vec<_> = states
-        .iter()
-        .map(|st| {
-            (
-                st.idx_1,
-                st.idx_2,
-                st.best_score_1 + half_norms[st.idx_1],
-                st.best_score_2 + half_norms[st.idx_2],
-                st.best_score_2 > f32::NEG_INFINITY,
-            )
-        })
-        .collect();
-
-    let results: Vec<(f32, [usize; 2])> = if parallel {
+    let results: Vec<(f32, [usize; 2], bool)> = if parallel {
         x_matrix
             .par_chunks_exact_mut(d)
-            .zip(phase2_inputs.par_iter())
-            .map(|(x_row, &(i1, i2, dot_x1, dot_x2, valid))| {
-                if !valid {
-                    return (0.0, [0, 0]);
+            .enumerate()
+            .map(|(index, x_row)| {
+                if finished[index] {
+                    return (0.0, previous_pairs[index], true);
                 }
-                let sq = project_onto_bisector(x_row, a_matrix, a_norms, d, i1, i2, dot_x1, dot_x2);
-                (sq, canonical_pair(i1, i2))
+                let state = &states[index];
+                if state.best_score_2 == f32::NEG_INFINITY {
+                    return (f32::INFINITY, [usize::MAX, usize::MAX], false);
+                }
+                let pair = canonical_pair(state.idx_1, state.idx_2);
+                if pair == previous_pairs[index] {
+                    return (0.0, pair, true);
+                }
+                let sq = project_onto_bisector(x_row, a_matrix, d, state.idx_1, state.idx_2);
+                (sq, pair, sq <= tolerance)
             })
             .collect()
     } else {
         x_matrix
             .chunks_exact_mut(d)
-            .zip(phase2_inputs.iter())
-            .map(|(x_row, &(i1, i2, dot_x1, dot_x2, valid))| {
-                if !valid {
-                    return (0.0, [0, 0]);
+            .enumerate()
+            .map(|(index, x_row)| {
+                if finished[index] {
+                    return (0.0, previous_pairs[index], true);
                 }
-                let sq = project_onto_bisector(x_row, a_matrix, a_norms, d, i1, i2, dot_x1, dot_x2);
-                (sq, canonical_pair(i1, i2))
+                let state = &states[index];
+                if state.best_score_2 == f32::NEG_INFINITY {
+                    return (f32::INFINITY, [usize::MAX, usize::MAX], false);
+                }
+                let pair = canonical_pair(state.idx_1, state.idx_2);
+                if pair == previous_pairs[index] {
+                    return (0.0, pair, true);
+                }
+                let sq = project_onto_bisector(x_row, a_matrix, d, state.idx_1, state.idx_2);
+                (sq, pair, sq <= tolerance)
             })
             .collect()
     };
 
     let mut total_sq_movement = 0.0f32;
     let mut pairs = Vec::with_capacity(k);
-    for (sq, pair) in results {
+    let mut next_finished = Vec::with_capacity(k);
+    for (sq, pair, point_finished) in results {
         total_sq_movement += sq;
         pairs.push(pair);
+        next_finished.push(point_finished);
     }
 
     IterationResult {
         inertia: total_sq_movement / k as f32,
         pairs,
+        finished: next_finished,
     }
 }

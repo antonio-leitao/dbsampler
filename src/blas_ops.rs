@@ -1,4 +1,4 @@
-use cblas_sys::{cblas_saxpy, cblas_sdot, cblas_sgemm, CblasNoTrans, CblasRowMajor, CblasTrans};
+use cblas_sys::{cblas_sdot, cblas_sgemm, CblasNoTrans, CblasRowMajor, CblasTrans};
 
 /// Computes ||row_i||^2 for each row.
 pub fn row_norms_sq(rows: usize, cols: usize, data: &[f32]) -> Vec<f32> {
@@ -44,39 +44,6 @@ pub fn compute_xat_dot_products(
             0.0,
             s_buf.as_mut_ptr(),
             n as i32,
-        );
-    }
-}
-
-/// Computes dot(a[row_i], a[row_j]) using BLAS sdot.
-#[inline]
-pub fn dot_rows(a: &[f32], d: usize, row_i: usize, row_j: usize) -> f32 {
-    debug_assert!(a.len() >= (row_i + 1) * d);
-    debug_assert!(a.len() >= (row_j + 1) * d);
-    unsafe {
-        cblas_sdot(
-            d as i32,
-            a.as_ptr().add(row_i * d),
-            1,
-            a.as_ptr().add(row_j * d),
-            1,
-        )
-    }
-}
-
-/// Computes x += alpha * a[row], i.e. SAXPY on a row of a matrix.
-#[inline]
-pub fn axpy_row(x: &mut [f32], alpha: f32, a: &[f32], d: usize, row: usize) {
-    debug_assert!(x.len() >= d);
-    debug_assert!(a.len() >= (row + 1) * d);
-    unsafe {
-        cblas_saxpy(
-            d as i32,
-            alpha,
-            a.as_ptr().add(row * d),
-            1,
-            x.as_mut_ptr(),
-            1,
         );
     }
 }
