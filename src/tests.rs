@@ -143,6 +143,35 @@ fn full_and_chunked_iterations_match() {
 }
 
 #[test]
+fn score_tiles_stay_within_the_memory_budget() {
+    for (k, n, max_scores) in [
+        (1_000, 8_000, SCORE_TILE_ELEMENTS),
+        (1_000, 9_000, SCORE_TILE_ELEMENTS),
+        (512, 20_000, SCORE_TILE_ELEMENTS),
+        (20_000, 512, SCORE_TILE_ELEMENTS),
+        (3, 4, 2),
+    ] {
+        let (query_tile, data_tile) = score_tile_shape(k, n, max_scores);
+        assert!(query_tile > 0 && query_tile <= k);
+        assert!(data_tile > 0 && data_tile <= n);
+        assert!(query_tile * data_tile <= max_scores);
+    }
+
+    assert_eq!(
+        score_tile_shape(1_000, 8_000, SCORE_TILE_ELEMENTS),
+        (1_000, 8_000)
+    );
+    assert_eq!(
+        score_tile_shape(1_000, 9_000, SCORE_TILE_ELEMENTS),
+        (1_000, DATA_TILE_SIZE)
+    );
+    assert_eq!(
+        score_tile_shape(20_000, 512, SCORE_TILE_ELEMENTS),
+        (SCORE_TILE_ELEMENTS / 512, 512)
+    );
+}
+
+#[test]
 fn sparse_deduplication_keeps_only_finished_unique_pairs() {
     let points = [0.0f32, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0];
     let pairs = [[0, 1], [0, 1], [1, 2], [0, 1]];
@@ -168,4 +197,82 @@ fn validation_accepts_strided_arrays_and_rejects_invalid_inputs() {
 
     let duplicates = array![[0.0f64, 0.0], [0.0, 0.0], [1.0, 1.0]];
     assert!(validation::prepare(duplicates.view(), &[0, 1, 1], 8, 10, 1e-6).is_err());
+}
+
+#[test]
+fn supplied_points_record_their_own_convergence_iteration() {
+    let data = [-0.5f32, 0.5];
+    let norms = blas_ops::row_norms_sq(2, 1, &data);
+    let half_norms = blas_ops::half_row_norms_sq(&norms);
+    let result = converge_points(
+        vec![-0.25, 0.0],
+        2,
+        1,
+        &data,
+        &half_norms,
+        &[0, 1],
+        10,
+        0.0,
+        false,
+        true,
+    );
+
+    assert_eq!(result.point_iterations, vec![2, 1]);
+    assert!(result.finished.iter().all(|&finished| finished));
+}
+
+#[test]
+fn adaptive_batches_find_unique_boundary_pairs_reproducibly() {
+    let data = [-0.5f32, -0.3, -0.1, 0.1, 0.3, 0.5];
+    let labels = [0usize, 1, 0, 1, 0, 1];
+    let options = BatchOptions {
+        target_points: 5,
+        batch_size: 2,
+        max_batches: 20,
+        max_iterations: 10,
+        tolerance: 0.0,
+        parallel: false,
+        seed: Some(31),
+        adaptive: true,
+    };
+
+    let first = dbs_batched_core(6, 1, &data, &labels, &options).unwrap();
+    let second = dbs_batched_core(6, 1, &data, &labels, &options).unwrap();
+
+    assert_eq!(first.m, 5);
+    assert_eq!(first.pairs, second.pairs);
+    assert_eq!(first.x_matrix, second.x_matrix);
+    assert_eq!(first.queries, second.queries);
+    assert_eq!(
+        first
+            .pairs
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        first.m
+    );
+    for (&point, pair) in first.x_matrix.iter().zip(first.pairs.iter()) {
+        assert_close(point, 0.5 * (data[pair[0]] + data[pair[1]]), 1e-6);
+    }
+}
+
+#[test]
+fn adaptive_batches_respect_the_hard_batch_limit() {
+    let options = BatchOptions {
+        target_points: 10,
+        batch_size: 4,
+        max_batches: 2,
+        max_iterations: 10,
+        tolerance: 0.0,
+        parallel: false,
+        seed: Some(9),
+        adaptive: true,
+    };
+    let result = dbs_batched_core(2, 1, &[-0.5, 0.5], &[0, 1], &options).unwrap();
+
+    assert_eq!(result.m, 1);
+    assert_eq!(result.batches, 2);
+    assert_eq!(result.queries, 8);
+    assert_eq!(result.pairs, vec![[0, 1]]);
 }
