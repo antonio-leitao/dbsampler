@@ -9,8 +9,8 @@ name = "dbsampler"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = "0.28.0"
-numpy = "0.28.0"
+pyo3 = "0.29.0"
+numpy = "0.29.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
 cblas-sys = "0.1"
